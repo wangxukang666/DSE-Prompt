@@ -1,0 +1,87 @@
+from sklearn.metrics import auc, roc_auc_score, average_precision_score, f1_score, precision_recall_curve, pairwise
+import numpy as np
+from skimage import measure
+
+
+def cal_pro_score(masks, amaps, max_step=200, expect_fpr=0.3):
+    # ref: https://github.com/gudovskiy/cflow-ad/blob/master/train.py
+    binary_amaps = np.zeros_like(amaps, dtype=bool)
+    min_th, max_th = amaps.min(), amaps.max()
+    delta = (max_th - min_th) / max_step
+    pros, fprs, ths = [], [], []
+    for th in np.arange(min_th, max_th, delta):
+        binary_amaps[amaps <= th], binary_amaps[amaps > th] = 0, 1
+        pro = []
+        for binary_amap, mask in zip(binary_amaps, masks):
+            for region in measure.regionprops(measure.label(mask)):
+                tp_pixels = binary_amap[region.coords[:, 0], region.coords[:, 1]].sum()
+                pro.append(tp_pixels / region.area)
+        inverse_masks = 1 - masks
+        fp_pixels = np.logical_and(inverse_masks, binary_amaps).sum()
+        fpr = fp_pixels / inverse_masks.sum()
+        pros.append(np.array(pro).mean())
+        fprs.append(fpr)
+        ths.append(th)
+    pros, fprs, ths = np.array(pros), np.array(fprs), np.array(ths)
+    idxes = fprs < expect_fpr
+    fprs = fprs[idxes]
+    fprs = (fprs - fprs.min()) / (fprs.max() - fprs.min())
+    pro_auc = auc(fprs, pros[idxes])
+    return pro_auc
+
+
+def image_level_metrics(results, obj, metric):
+    gt = np.array(results[obj]['gt_sp'])
+    pr = np.array(results[obj]['pr_sp'])
+
+    if metric == 'image-auroc':
+        if np.unique(gt).size < 2:
+            return 0.0
+        return roc_auc_score(gt, pr)
+
+    elif metric == 'image-ap':
+        if np.unique(gt).size < 2:
+            return 0.0
+        return average_precision_score(gt, pr)
+
+    elif metric == 'F1':
+        if np.unique(gt).size < 2:
+            return 0.0
+        precisions, recalls, _ = precision_recall_curve(gt, pr)
+        f1_scores = (2 * precisions * recalls) / (precisions + recalls + 1e-8)
+        return np.max(f1_scores[np.isfinite(f1_scores)])
+
+    # table.append(str(np.round(performance * 100, decimals=1)))
+
+
+def pixel_level_metrics(results, obj, metric):
+    gt = np.array(results[obj]['imgs_masks'])
+    pr = np.array(results[obj]['anomaly_maps'])
+
+    if metric == 'pixel-auroc':
+        gt_flat = gt.ravel()
+        pr_flat = pr.ravel()
+
+        if np.unique(gt_flat).size < 2:
+            return 0.0
+
+        return roc_auc_score(gt_flat, pr_flat)
+
+    elif metric == 'pixel-aupro':
+        if len(gt.shape) == 4:
+            gt = gt.squeeze(1)
+        if len(pr.shape) == 4:
+            pr = pr.squeeze(1)
+        return cal_pro_score(gt, pr)
+
+    elif metric == 'F1':
+        gt_flat = gt.ravel()
+        pr_flat = pr.ravel()
+
+        if np.unique(gt_flat).size < 2:
+            return 0.0
+
+        precisions, recalls, _ = precision_recall_curve(gt_flat, pr_flat)
+        f1_scores = (2 * precisions * recalls) / (precisions + recalls + 1e-8)
+        return np.max(f1_scores[np.isfinite(f1_scores)])
+
