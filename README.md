@@ -1,270 +1,111 @@
 # DSE-Prompt
 
-Official PyTorch implementation of **DSE-Prompt**, a dual-state evidence-decoupled prompt-learning framework for zero-shot anomaly detection.
+Official PyTorch implementation of:
 
-> The codebase is developed on top of [FAPrompt](https://github.com/guojiajeremy/FAPrompt) and [AnomalyCLIP](https://github.com/zqhang/AnomalyCLIP).  
-> The Python environment follows the official FAPrompt implementation.
-
----
-
-## Overview
-
-DSE-Prompt extends fine-grained abnormality prompt learning with two state-specific evidence aggregation branches:
-
-- a **normal-state branch**, which absorbs evidence from patches with low abnormal similarity;
-- an **abnormal-state branch**, which selects high-confidence abnormal evidence using a dynamic threshold.
-
-Each branch contains learnable visual anchors, positional embeddings, spatial attention, a prompt-dependent gate, and a residual modulation coefficient. The normal and abnormal prompts are therefore enhanced through different evidence-admission rules before image-level anomaly discrimination and pixel-level anomaly localization.
-
-The current implementation includes:
-
-- learnable normal and abnormal evidence anchors;
-- spatial attention over CLIP patch features;
-- gated residual prompt enhancement;
-- dynamic abnormal-evidence threshold scheduling;
-- normal-region exclusion based on abnormal similarity;
-- fallback evidence selection with a penalty coefficient;
-- abnormal-prompt diversity regularization;
-- image-level global/local score fusion;
-- pixel-level AUROC and AUPRO evaluation;
-- image-level AUROC and AP evaluation.
+**DSE-Prompt: Dual-State Evidence-Decoupled Prompt Learning for Zero-Shot Anomaly Detection**
 
 ---
 
-## Method Components
+## 1. Project Introduction
 
-### Dual Evidence Aggregation Modules
+### Abstract
 
-The implementation uses two independent `SCA_Module` instances:
+Although vision–language-model-based zero-shot anomaly detection has advanced substantially in cross-category settings, existing prompt modulation paradigms remain limited in two respects. First, during sample-adaptive prompt modulation, anomaly prompts simultaneously perform local evidence retrieval, semantic discrimination, and pixel-level localization. This role coupling biases them toward high-response regions, creating a self-confirming loop in which the discriminator also serves as the evidence selector. Second, normal prompts usually act only as static references to normality in the final similarity-based competition, restricting the use of stable background cues during evidence absorption.
 
-```python
-sca_module_norm = SCA_Module(
-    embed_dim=768,
-    num_anchors=num_norm_anchors,
-    num_patches=1369
-)
+To address these limitations, we propose Dual-State Evidence-Decoupled Prompt Learning (DSE-Prompt). DSE-Prompt constructs an independent visual evidence layer in which learnable evidence anchors aggregate local evidence, while a gated residual mechanism selectively injects candidate evidence into prompts, thereby decoupling anomaly semantic representation from low-level evidence retrieval. Furthermore, normal prompts are incorporated into evidence absorption, and normal-evidence masks derived from the original anomaly responses stabilize the normal state and reinforce the benefits of evidence–semantic decoupling.
 
-sca_module_abn = SCA_Module(
-    embed_dim=768,
-    num_anchors=num_abn_anchors,
-    num_patches=1369
-)
-```
+Experimental results demonstrate that DSE-Prompt achieves more stable overall performance across image-level anomaly discrimination, pixel-level anomaly localization, and cross-dataset evaluation.
 
-For each branch, learnable anchor queries attend to normalized CLIP patch features. The aggregated evidence is injected into the text features through a gated residual connection:
+### Method Framework
 
-```text
-enhanced_text = normalize(text_features + res_scale × gated_evidence)
-```
+<p align="center">
+  <img src="assets/framework.png" width="95%">
+</p>
 
-### Normal-State Evidence Selection
+<p align="center">
+  <b>Overall framework of DSE-Prompt.</b>
+</p>
 
-The normal branch excludes patches whose similarity to abnormal prompts is higher than `norm_exclusion_thresh`. This reduces contamination of the normal prompt by suspicious regions.
-
-### Abnormal-State Evidence Selection
-
-The abnormal branch retains patches whose cosine similarity to an abnormal anchor is higher than the current threshold. During training, the threshold increases linearly from `thresh_start` to `thresh_end`.
-
-When no patch satisfies the threshold, the most similar patch is selected as fallback evidence and its contribution is multiplied by `fallback_penalty`.
-
-### Prompt Diversity Regularization
-
-Pairwise cosine similarity among enhanced abnormal prompts is constrained to the interval:
-
-```text
-[div_sim_lower, div_sim_upper]
-```
-
-The regularization weight is gradually increased during the warm-up stage.
+The framework consists of vision–language encoding, Evidence–Semantic Decoupling, and normal–anomalous Dual-State Coupling. Learnable evidence anchors independently aggregate local visual evidence, while state-specific evidence-admission rules selectively enhance normal and anomaly prompts for image-level anomaly discrimination and pixel-level anomaly localization.
 
 ---
 
-## Repository Structure
+## 2. Environment
 
-Before uploading the project to GitHub, organize the files as follows:
+### Environment Installation
 
-```text
-DSE-Prompt/
-├── AnomalyCLIP_lib/        # AnomalyCLIP/OpenCLIP implementation
-├── dataset.py              # Dataset loader
-├── FAPrompt.py             # Fine-grained prompt learner
-├── train.py                # DSE-Prompt training
-├── test.py                 # Evaluation
-├── train.sh                # Training example
-├── test.sh                 # Testing example
-├── loss.py                 # Focal and Dice losses
-├── metrics.py              # AUROC, AP, F1, and AUPRO
-├── logger.py               # Logging utility
-├── utils.py                # Image and mask transformations
-├── visualization.py        # Heatmap visualization
-├── requirements.txt
-└── README.md
-```
+The environment configuration of DSE-Prompt is consistent with that of [FAPrompt](https://github.com/mala-lab/FAPrompt).
 
-The uploaded files should be renamed as follows:
+Please follow the environment and dependency installation instructions provided in the official FAPrompt repository.
 
-| Current filename | Recommended filename |
-|---|---|
-| `FAPrompt(1).py` | `FAPrompt.py` |
-| `train(13).py` | `train.py` |
-| `test(3).py` | `test.py` |
-| `train(2).sh` | `train.sh` |
-| `test(2).sh` | `test.sh` |
-| `metrics(1).py` | `metrics.py` |
-| `README(1).md` | `README.md` |
+### Data Preparation
 
-The repository must also contain `dataset.py` and the `AnomalyCLIP_lib/` directory because they are imported by the training and testing scripts.
+#### 1. Dataset Download
 
----
+DSE-Prompt is trained using the MVTec AD test split as auxiliary source-domain anomaly data and is directly evaluated on unseen industrial and medical datasets without target-domain training or fine-tuning.
 
-## Environment
+| Usage                | Domain     | Dataset       | Download                                                                                                   |
+| -------------------- | ---------- | ------------- | ---------------------------------------------------------------------------------------------------------- |
+| Auxiliary training   | Industrial | MVTec AD      | [Download](https://www.mvtec.com/research-teaching/datasets/mvtec-ad)                                      |
+| Zero-shot evaluation | Industrial | DTD-Synthetic | [Download](https://drive.google.com/drive/folders/10OyPzvI3H6llCZBxKxFlKWt1Pw1tkMK1)                       |
+| Zero-shot evaluation | Industrial | MPDD          | [Download](https://github.com/stepanje/MPDD)                                                               |
+| Zero-shot evaluation | Industrial | VisA          | [Download](https://github.com/amazon-science/spot-diff)                                                    |
+| Zero-shot evaluation | Industrial | DAGM          | [Download](https://www.kaggle.com/datasets/mhskjelvareid/dagm-2007-competition-dataset-optical-inspection) |
+| Zero-shot evaluation | Medical    | BrainMRI      | [Download](https://www.kaggle.com/datasets/navoneel/brain-mri-images-for-brain-tumor-detection)            |
+| Zero-shot evaluation | Medical    | Br35H         | [Download](https://www.kaggle.com/datasets/ahmedhamada0/brain-tumor-detection)                             |
+| Zero-shot evaluation | Medical    | CVC-ColonDB   | [Download](https://figshare.com/articles/figure/Polyp_DataSet_zip/21221579)                                |
+| Zero-shot evaluation | Medical    | CVC-ClinicDB  | [Download](https://figshare.com/articles/figure/Polyp_DataSet_zip/21221579)                                |
+| Zero-shot evaluation | Medical    | Kvasir-SEG    | [Download](https://figshare.com/articles/figure/Polyp_DataSet_zip/21221579)                                |
+| Zero-shot evaluation | Medical    | ISIC          | [Download](https://drive.google.com/file/d/1UeuKgF1QYfT1jTlYHjxKB3tRjrFHfFDR/view)                         |
+| Zero-shot evaluation | Medical    | TN3K          | [Download](https://github.com/haifangong/TRFE-Net-for-thyroid-nodule-segmentation)                         |
 
-The runtime environment follows the official FAPrompt implementation.
+#### 2. Dataset Organization
 
-### Hardware
-
-- Single NVIDIA GeForce RTX 3090
-
-### Main Dependencies
-
-```text
-Python
-tqdm == 4.67.1
-timm == 0.6.12
-scikit-image == 0.19.2
-scikit-learn == 1.0.2
-scipy == 1.7.3
-seaborn == 0.11.2
-torch == 2.4.1
-torchvision == 0.19.1
-transformers == 4.31.0
-```
-
-The current code additionally uses:
-
-```text
-numpy
-opencv-python
-tabulate
-setuptools
-```
-
-A corresponding installation command is:
-
-```bash
-pip install \
-    tqdm==4.67.1 \
-    timm==0.6.12 \
-    scikit-image==0.19.2 \
-    scikit-learn==1.0.2 \
-    scipy==1.7.3 \
-    seaborn==0.11.2 \
-    torch==2.4.1 \
-    torchvision==0.19.1 \
-    transformers==4.31.0 \
-    numpy \
-    opencv-python \
-    tabulate \
-    setuptools
-```
-
-Install the PyTorch build that matches the CUDA environment of your machine when necessary.
-
----
-
-## Data Preparation
-
-The dataset preparation procedure is the same as FAPrompt and AnomalyCLIP.
-
-### Step 1: Download the datasets
-
-Examples of supported anomaly-detection datasets include:
-
-#### Industrial datasets
-
-- MVTec AD
-- VisA
-- ELPV
-- SDD
-- AITEX
-- BTAD
-- DAGM
-- DTD-Synthetic
-- MPDD
-
-#### Medical datasets
-
-- BrainMRI
-- HeadCT
-- LAG
-- Br35H
-- CVC-ColonDB
-- CVC-ClinicDB
-- Kvasir
-- Endo
-- ISIC
-- TN3K
-
-### Step 2: Generate dataset JSON files
-
-Generate the JSON annotation files using the same format adopted by AnomalyCLIP.
-
-### Step 3: Set dataset paths
-
-Do not keep private server paths in the public repository. Replace paths such as:
-
-```text
-/home/ubuntu/username/data/...
-```
-
-with your own local or server path when running the code.
-
-Example directory:
+The downloaded datasets can be organized as follows:
 
 ```text
 data/
 ├── mvtec_anomaly_detection/
-├── visa_anomaly_detection/
-├── DAGM_anomaly_detection/
-├── br35_anomaly_detection/
+├── dtd_synthetic/
+├── mpdd/
+├── visa/
+├── dagm/
+├── brainmri/
+├── br35h/
+├── cvc_colondb/
+├── cvc_clinicdb/
+├── kvasir_seg/
+├── isic/
+└── tn3k/
+```
+
+The original internal structure of each dataset should be retained. A `meta.json` annotation file should be generated for each dataset using the format adopted by [AnomalyCLIP](https://github.com/zqhang/AnomalyCLIP).
+
+An example dataset root is shown below:
+
+```text
+dataset_root/
+├── meta.json
+├── category_1/
+│   ├── ground_truth/
+│   └── test/
+├── category_2/
+│   ├── ground_truth/
+│   └── test/
 └── ...
 ```
 
+The dataset root is specified through `--train_data_path` during training and `--data_path` during inference.
+
 ---
 
-## Training
+## 3. Training and Inference
 
-The main training script is `train.py`.
+### Training
 
-### Recommended Configuration
+DSE-Prompt is trained on the test split of MVTec AD as auxiliary source-domain anomaly data.
 
-The paper configuration uses:
-
-| Argument | Value |
-|---|---:|
-| Backbone | ViT-L/14@336px |
-| Image size | 518 |
-| Feature layers | 6, 12, 18, 24 |
-| DPAM layer | 20 |
-| Prompt depth | 9 |
-| Normal context length | 12 |
-| Deep text context length | 4 |
-| Batch size | 8 |
-| Epochs | 25 |
-| Learning rate | 1e-4 |
-| Random seed | 111 |
-| Normal anchors | 1 |
-| Abnormal anchors | 10 |
-| Threshold start | 0.4 |
-| Threshold end | 0.7 |
-| Threshold warm-up | 5 epochs |
-| Normal exclusion threshold | 0.6 |
-| Fallback penalty | 0.1 |
-| Global score weight | 0.5 |
-| Diversity interval | [0.0, 0.2] |
-| Gradient clipping | 1.0 |
-
-### Command
+Run the following command:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python train.py \
@@ -295,46 +136,13 @@ CUDA_VISIBLE_DEVICES=0 python train.py \
     --seed 111
 ```
 
-Alternatively:
+Replace `/path/to/mvtec_anomaly_detection` with the actual path to the MVTec AD dataset.
 
-```bash
-bash train.sh
-```
+The trained checkpoints are saved in the directory specified by `--save_path`.
 
-Before running `train.sh`, replace the dataset path, output path, and Python filename with the paths used on your machine.
+### Inference
 
-### Checkpoints
-
-A checkpoint is saved after every `save_freq` epochs and contains:
-
-```text
-prompt_learner
-sca_module_norm
-sca_module_abn
-```
-
-Example:
-
-```text
-checkpoints/
-└── trained_on_mvtecad/
-    ├── epoch_1.pth
-    ├── epoch_2.pth
-    └── epoch_25.pth
-```
-
----
-
-## Evaluation
-
-The evaluation script reports:
-
-- Pixel AUROC
-- Pixel AUPRO
-- Image AUROC
-- Image AP
-
-### Command
+Run the following command to evaluate a trained checkpoint:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python test.py \
@@ -357,120 +165,93 @@ CUDA_VISIBLE_DEVICES=0 python test.py \
     --seed 111
 ```
 
-Alternatively:
+Replace the following arguments according to the target dataset:
 
-```bash
-bash test.sh
-```
+* `--dataset`: dataset identifier used by the dataset loader;
+* `--data_path`: path to the target dataset;
+* `--save_path`: directory used to save evaluation logs;
+* `--checkpoint_path`: path to the trained DSE-Prompt checkpoint.
 
-Before running `test.sh`, update:
-
-- the testing dataset name;
-- the dataset path;
-- the checkpoint path;
-- the output directory;
-- the Python filename.
-
-The anchor numbers and prompt configuration used during testing must match those stored in the checkpoint.
-
-For the final checkpoint trained with a threshold schedule ending at `0.7`, use:
-
-```bash
---sca_threshold 0.7
-```
+The prompt configuration and numbers of normal and anomaly evidence anchors used during inference must match the training configuration.
 
 ---
 
-## Output
+## 4. Results
 
-The logger creates:
+### Quantitative Results
 
-```text
-save_path/
-└── log.txt
-```
+The best and second-best results are marked in **bold** and <u>underlined</u>, respectively.
 
-The evaluation results are printed and saved as a Markdown-style table:
+#### 1. Image-Level Anomaly Discrimination
 
-```text
-| Objects | Pixel_AUROC | Pixel_AUPRO | Image_AUROC | Image_AP |
-|---------|-------------|-------------|-------------|----------|
-| ...     | ...         | ...         | ...         | ...      |
-| Mean    | ...         | ...         | ...         | ...      |
-```
+Image-level results are reported as **(I-AUROC, I-AP)**.
 
----
+| Data Type  | Dataset  | CLIP         | WinCLIP      | APRIL-GAN    | CoOp         | CoCoOp       | AnomalyCLIP  | FiLo                 | FAPrompt                   | DSE-Prompt                 |
+| ---------- | -------- | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | -------------------- | -------------------------- | -------------------------- |
+| Industrial | DTD      | (71.6, 85.7) | (93.2, 92.6) | (86.4, 95.0) | (83.1, 91.9) | (84.1, 92.9) | (93.5, 97.0) | (94.7, 98.0)         | (<u>96.2</u>, <u>98.1</u>) | (**96.6**, **98.6**)       |
+| Industrial | MPDD     | (54.3, 65.4) | (63.6, 69.9) | (73.0, 80.2) | (55.1, 64.2) | (61.0, 69.1) | (77.0, 82.0) | (74.4, 76.9)         | (<u>79.7</u>, <u>83.3</u>) | (**80.7**, **83.8**)       |
+| Industrial | VisA     | (66.4, 71.4) | (78.8, 81.4) | (78.0, 81.4) | (62.8, 68.1) | (78.1, 82.3) | (82.1, 84.6) | (**83.9**, **87.3**) | (<u>83.8</u>, 86.0)        | (<u>83.8</u>, <u>86.5</u>) |
+| Industrial | DAGM     | (79.6, 59.0) | (91.8, 79.5) | (94.4, 83.8) | (87.5, 74.6) | (96.3, 85.5) | (97.5, 92.3) | (96.6, 90.4)         | (<u>98.4</u>, <u>95.3</u>) | (**98.5**, **95.8**)       |
+| Medical    | BrainMRI | (73.9, 81.7) | (86.6, 91.5) | (89.3, 90.9) | (61.3, 44.9) | (78.2, 86.7) | (90.3, 92.2) | (94.5, <u>94.9</u>)  | (<u>95.2</u>, 94.4)        | (**95.8**, **96.5**)       |
+| Medical    | Br35H    | (78.4, 78.8) | (80.5, 82.2) | (93.1, 92.9) | (86.0, 87.5) | (85.7, 89.1) | (94.6, 94.7) | (**97.7**, 96.8)     | (97.1, <u>96.9</u>)        | (<u>97.5</u>, **97.4**)    |
 
-## Visualization
+#### 2. Pixel-Level Anomaly Localization
 
-`visualization.py` overlays the anomaly score map on the original image using the JET color map.
+Pixel-level results are reported as **(P-AUROC, PRO)**.
 
-The visualization utility expects:
+| Data Type  | Dataset      | CLIP         | WinCLIP      | APRIL-GAN    | CoOp         | CoCoOp       | AnomalyCLIP         | FiLo                 | FAPrompt                   | DSE-Prompt                 |
+| ---------- | ------------ | ------------ | ------------ | ------------ | ------------ | ------------ | ------------------- | -------------------- | -------------------------- | -------------------------- |
+| Industrial | DTD          | (33.9, 12.5) | (83.9, 57.8) | (95.3, 86.9) | (55.8, 36.0) | (93.7, 83.7) | (97.9, <u>92.3</u>) | (<u>98.1</u>, 88.6)  | (**98.3**, **92.6**)       | (**98.3**, **92.6**)       |
+| Industrial | MPDD         | (62.1, 33.0) | (76.4, 48.9) | (94.1, 83.2) | (15.4, 2.3)  | (95.2, 84.2) | (**96.5**, 87.0)    | (95.7, 84.7)         | (<u>96.3</u>, **87.9**)    | (<u>96.3</u>, <u>87.6</u>) |
+| Industrial | VisA         | (46.6, 14.8) | (79.6, 56.8) | (94.2, 86.8) | (24.1, 3.8)  | (93.6, 86.7) | (95.5, 87.0)        | (**95.9**, 85.4)     | (<u>95.7</u>, **87.7**)    | (<u>95.7</u>, <u>87.2</u>) |
+| Industrial | DAGM         | (28.2, 2.9)  | (87.6, 65.7) | (82.4, 66.2) | (17.5, 2.1)  | (82.8, 75.1) | (95.6, 91.0)        | (96.8, 90.6)         | (<u>98.2</u>, <u>95.3</u>) | (**98.3**, **95.4**)       |
+| Medical    | CVC-ColonDB  | (49.5, 15.8) | (70.3, 32.5) | (78.4, 64.6) | (40.5, 2.6)  | (79.1, 69.7) | (81.9, 71.3)        | (81.5, 63.9)         | (<u>84.1</u>, <u>73.8</u>) | (**85.8**, **75.5**)       |
+| Medical    | CVC-ClinicDB | (47.5, 18.9) | (51.2, 13.8) | (80.5, 60.7) | (34.8, 2.4)  | (83.4, 68.8) | (82.9, 67.8)        | (<u>84.6</u>, 62.3)  | (84.2, <u>69.7</u>)        | (**85.2**, **71.8**)       |
+| Medical    | Kvasir       | (44.6, 17.7) | (69.7, 24.5) | (75.0, 36.2) | (44.1, 3.5)  | (79.1, 38.6) | (78.9, 45.6)        | (**85.0**, **53.2**) | (80.4, 48.0)               | (<u>82.4</u>, <u>50.1</u>) |
+| Medical    | ISIC         | (33.1, 5.8)  | (83.3, 55.1) | (89.4, 77.2) | (51.7, 15.9) | (81.9, 68.9) | (89.7, 78.4)        | (**91.1**, 80.1)     | (<u>90.9</u>, <u>81.6</u>) | (**91.1**, **82.7**)       |
+| Medical    | TN3K         | (42.3, 7.3)  | (70.7, 39.8) | (73.6, 37.8) | (34.0, 9.5)  | (72.4, 41.0) | (81.5, 50.4)        | (79.8, 48.5)         | (<u>84.7</u>, <u>54.6</u>) | (**85.1**, **55.1**)       |
 
-- input image paths;
-- predicted anomaly maps;
-- image size;
-- output directory;
-- class names.
+### Qualitative Results
 
-The current output path is constructed inside the function. Before public release, replace the hard-coded subdirectory:
+Each row presents the input image, pixel-level ground-truth mask, and the anomaly heatmap and binary prediction generated by DSE-Prompt and FAPrompt.
 
-```python
-'imgs/btad2'
-```
+#### 1. Industrial Anomaly Detection
 
-with a general path such as:
+<p align="center">
+  <img src="assets/industrial_visualization.png" width="90%">
+</p>
 
-```python
-'visualizations'
-```
+<p align="center">
+  <b>Qualitative comparison on industrial anomaly detection datasets.</b>
+</p>
 
----
+DSE-Prompt produces more concentrated anomaly responses around true defect regions and reduces diffuse responses over repetitive textures and structured industrial backgrounds.
 
-## Important Reproducibility Notes
+#### 2. Medical Anomaly Detection
 
-1. `train.py` defines `t_n_ctx=10` by default, while the provided training shell script explicitly uses `t_n_ctx=4`. The paper configuration should therefore be run with:
+<p align="center">
+  <img src="assets/medical_visualization.png" width="90%">
+</p>
 
-   ```bash
-   --t_n_ctx 4
-   ```
+<p align="center">
+  <b>Qualitative comparison on medical anomaly detection datasets.</b>
+</p>
 
-2. `train.py` defines `epoch=15` by default, while the provided shell script uses 25 epochs. To reproduce the paper setting, explicitly use:
-
-   ```bash
-   --epoch 25
-   ```
-
-3. The final training threshold is `0.7`. Evaluation should use the same final threshold unless a different checkpoint-specific value is intended.
-
-4. The testing script currently defines `global_score_weight=0.4` by default, whereas the training script and paper setting use `0.5`. For consistent reproduction, explicitly pass:
-
-   ```bash
-   --global_score_weight 0.5
-   ```
-
-5. The number of normal and abnormal anchors used during evaluation must match the corresponding checkpoint.
-
-6. Do not upload datasets, checkpoints, private server paths, API keys, or user credentials to GitHub.
+DSE-Prompt suppresses irrelevant responses in normal tissues and background regions while concentrating anomaly activations around lesions.
 
 ---
 
-## Acknowledgements
+## 5. License
 
-This implementation is based on:
+### License
 
-- **FAPrompt**: Fine-grained Abnormality Prompt Learning for Zero-shot Anomaly Detection
-- **AnomalyCLIP**: Object-agnostic Prompt Learning for Zero-shot Anomaly Detection
-- **CLIP/OpenCLIP**
+This project is released under the [MIT License](LICENSE).
 
-We thank the authors for releasing their code.
+### Acknowledgements
 
----
+This implementation is developed based on the following open-source projects:
 
+* [FAPrompt](https://github.com/mala-lab/FAPrompt): Fine-grained Abnormality Prompt Learning for Zero-Shot Anomaly Detection.
+* [AnomalyCLIP](https://github.com/zqhang/AnomalyCLIP): Object-agnostic Prompt Learning for Zero-Shot Anomaly Detection.
 
-
-## License
-
-Please check the licenses of FAPrompt, AnomalyCLIP, and all other upstream dependencies before assigning a license to this repository.
-
-Until a compatible license is added, the repository should not be treated as granting unrestricted permission to copy, modify, or redistribute the code.
+We sincerely thank the authors for making their code publicly available.
