@@ -103,76 +103,19 @@ The dataset root is specified through `--train_data_path` during training and `-
 
 ### Training
 
-DSE-Prompt is trained on the test split of MVTec AD as auxiliary source-domain anomaly data.
-
-Run the following command:
+The training command is:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python train.py \
-    --dataset mvtecad \
-    --train_data_path /path/to/mvtec_anomaly_detection \
-    --save_path ./checkpoints/trained_on_mvtecad \
-    --features_list 6 12 18 24 \
-    --image_size 518 \
-    --batch_size 8 \
-    --epoch 25 \
-    --learning_rate 0.0001 \
-    --print_freq 1 \
-    --save_freq 1 \
-    --depth 9 \
-    --n_ctx 12 \
-    --t_n_ctx 4 \
-    --warmup_epochs 5 \
-    --div_sim_lower 0.0 \
-    --div_sim_upper 0.2 \
-    --thresh_start 0.4 \
-    --thresh_end 0.7 \
-    --thresh_warmup_epochs 5 \
-    --fallback_penalty 0.1 \
-    --global_score_weight 0.5 \
-    --norm_exclusion_thresh 0.6 \
-    --num_norm_anchors 1 \
-    --num_abn_anchors 10 \
-    --seed 111
+bash train.sh
 ```
-
-Replace `/path/to/mvtec_anomaly_detection` with the actual path to the MVTec AD dataset.
-
-The trained checkpoints are saved in the directory specified by `--save_path`.
 
 ### Inference
 
-Run the following command to evaluate a trained checkpoint:
+The inference command is:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python test.py \
-    --dataset br35 \
-    --data_path /path/to/Br35H \
-    --save_path ./results/trained_on_mvtecad/br35 \
-    --checkpoint_path ./checkpoints/trained_on_mvtecad/epoch_25.pth \
-    --features_list 6 12 18 24 \
-    --image_size 518 \
-    --depth 9 \
-    --n_ctx 12 \
-    --t_n_ctx 4 \
-    --sigma 10 \
-    --sca_threshold 0.7 \
-    --fallback_penalty 0.1 \
-    --global_score_weight 0.5 \
-    --norm_exclusion_thresh 0.6 \
-    --num_norm_anchors 1 \
-    --num_abn_anchors 10 \
-    --seed 111
+bash test.sh
 ```
-
-Replace the following arguments according to the target dataset:
-
-* `--dataset`: dataset identifier used by the dataset loader;
-* `--data_path`: path to the target dataset;
-* `--save_path`: directory used to save evaluation logs;
-* `--checkpoint_path`: path to the trained DSE-Prompt checkpoint.
-
-The prompt configuration and numbers of normal and anomaly evidence anchors used during inference must match the training configuration.
 
 ---
 
