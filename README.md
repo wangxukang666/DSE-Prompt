@@ -19,7 +19,7 @@ Experimental results demonstrate that DSE-Prompt achieves more stable overall pe
 ### Method Framework
 
 <p align="center">
-  <img src="IMAGE/论文框架图.png" width="95%">
+  <img src="IMAGE/框架图.png" width="95%">
 </p>
 
 <p align="center">
