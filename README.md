@@ -218,7 +218,7 @@ Each row presents the input image, pixel-level ground-truth mask, and the anomal
 #### 1. Industrial Anomaly Detection
 
 <p align="center">
-  <img src="assets/industrial_visualization.png" width="90%">
+  <img src="IMAGE/工业可视化.png" width="90%">
 </p>
 
 <p align="center">
@@ -230,7 +230,7 @@ DSE-Prompt produces more concentrated anomaly responses around true defect regio
 #### 2. Medical Anomaly Detection
 
 <p align="center">
-  <img src="assets/medical_visualization.png" width="90%">
+  <img src="IMAGE/医学可视化.png" width="90%">
 </p>
 
 <p align="center">
