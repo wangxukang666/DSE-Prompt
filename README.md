@@ -467,31 +467,7 @@ We thank the authors for releasing their code.
 
 ---
 
-## Citation
 
-The formal citation of DSE-Prompt will be added after publication.
-
-```bibtex
-@article{dseprompt2026,
-  title   = {DSE-Prompt: Dual-State Evidence-Decoupled Prompt Learning for Zero-Shot Anomaly Detection},
-  author  = {To be updated},
-  journal = {To be updated},
-  year    = {2026}
-}
-```
-
-Please also cite the original FAPrompt work when using this repository:
-
-```bibtex
-@inproceedings{zhu2025fine,
-  title     = {Fine-grained Abnormality Prompt Learning for Zero-shot Anomaly Detection},
-  author    = {Zhu, Jiawen and Ong, Yew-Soon and Shen, Chunhua and Pang, Guansong},
-  booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision},
-  year      = {2025}
-}
-```
-
----
 
 ## License
 
